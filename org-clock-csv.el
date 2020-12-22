@@ -231,12 +231,82 @@ properties."
             :ishabit ishabit
             :tags tags))))
 
+(defun org-clock-csv--duration-to-integer (duration)
+  "Given a duration string of shape \"HH:MM\", returns an integer number of minutes elapsed."
+  (apply #'+ (seq-map-indexed
+              (lambda (val idx)
+                (if (eq idx 0) (* 60 (string-to-number val))
+                  (string-to-number val)))
+              (split-string duration ":" t))))
+
+(defun org-clock-csv--integer-to-duration (n)
+  "Given a number of elapsed minutes, returns a duration string of shape \"HH:MM\"."
+  (format "%s:%s"
+          (number-to-string (/ n 60))
+          (org-clock-csv--pad (mod n 60))))
+
+(defun org-clock-csv--combine-durations (&rest durations)
+  "Given any number of duration strings of shape \"HH:MM\", combines them together and returns an aggregate duration string in the same shape."
+  (org-clock-csv--integer-to-duration (seq-reduce
+                                       (lambda (acc duration) (+ acc (duration-to-integer duration)))
+                                       durations 0
+                                       )))
+
+(defun org-clock-csv--sort-datestrings (&rest datestrings)
+  "Give any number of Org timestamp date strings of shape \"YYYY-MM-DD ddd HH:MM\", sorts that list in ascending order."
+  (sort datestrings
+        (lambda (a b) (time-less-p (date-to-time a) (date-to-time b)))))
+
+(defun org-clock-csv--concat-element-plists (left right)
+  "Given two parsed ELEMENT plists, combines them together into a single item"
+  (let* ((start (car (org-clock-csv--sort-datestrings (plist-get left ':start) (plist-get right ':start))))
+         (end (cadr (org-clock-csv--sort-datestrings (plist-get left ':end) (plist-get right ':end))))
+         (combined-duration (org-clock-csv--combine-durations (plist-get left ':duration) (plist-get right ':duration))))
+    (list :task (plist-get left ':task)
+          :headline (plist-get left ':headline)
+          :parents (plist-get left ':parents)
+          :title (plist-get left ':title)
+          :category (plist-get left ':category)
+          :start start
+          :end end
+          :duration combined-duration
+          :properties (plist-get left ':properties)
+          :effort (plist-get left ':effort)
+          :ishabit (plist-get left ':ishabit)
+          :tags (plist-get left ':tags))))
+
+(defun org-clock-csv--consolidate-entries-get-key (entry)
+  "Given a parsed ELEMENT plist, returns a unique path+date key"
+  (let* ((split-date (parse-time-string (plist-get entry :start)))
+         (year (number-to-string (nth 5 split-date)))
+         (month (number-to-string (nth 4 split-date)))
+         (day (number-to-string (nth 3 split-date)))
+         (fullpath (concat (s-join org-clock-csv-headline-separator (plist-get entry ':parents)) "/" (plist-get entry :task)))
+         (keyparts (list fullpath year month day)))
+    (mapconcat 'identity keyparts "::")))
+
+(defun plist-get-values (plist)
+  (if (null plist) nil
+    (cons (cadr plist) (plist-get-values (cddr plist)))))
+
+(defun org-clock-csv--consolidate-entries (entries)
+  "Given a list of parsed ELEMENT plists, combines tasks with matching paths."
+  (plist-get-values
+   (seq-reduce
+    (lambda (acc entry)
+      (let ((key (org-clock-csv--consolidate-entries-get-key entry)))
+        (if (lax-plist-get acc key)
+            (lax-plist-put acc key (org-clock-csv--concat-element-plists (lax-plist-get acc key) entry))
+          (lax-plist-put acc key entry))))
+    entries
+    nil)))
+
 (defun org-clock-csv--get-org-data (property ast default)
   "Return the PROPERTY of the `org-data' structure in the AST
 or the DEFAULT value if it does not exist."
   (let ((value (org-element-map ast 'keyword
-		 (lambda (elem) (if (string-equal (org-element-property :key elem) property)
-				    (org-element-property :value elem))))))
+		             (lambda (elem) (if (string-equal (org-element-property :key elem) property)
+				                            (org-element-property :value elem))))))
     (if (equal nil value) default (car value))))
 
 (defun org-clock-csv--get-entries (filelist &optional no-check)
@@ -259,7 +329,7 @@ When NO-CHECK is non-nil, skip checking if all files exist."
 ;;;; Public API:
 
 ;;;###autoload
-(defun org-clock-csv (&optional infile no-switch use-current)
+(defun org-clock-csv (&optional infile no-switch consolidate use-current)
   "Export clock entries from INFILE to CSV format.
 
 When INFILE is a filename or list of filenames, export clock
@@ -268,12 +338,14 @@ entries from these files. Otherwise, use `org-agenda-files'.
 When NO-SWITCH is non-nil, do not call `switch-to-buffer' on the
 rendered CSV output, simply return the buffer.
 
+When CONSOLIDATE is non-nil, clock entries for a given Org entry on the same day will be collapsed into a single entry with a combined duration.
+
 USE-CURRENT takes the value of the prefix argument. When non-nil,
 use the current buffer for INFILE.
 
 See also `org-clock-csv-batch' for a function more appropriate
 for use in batch mode."
-  (interactive "i\ni\nP")
+  (interactive "i\ni\ni\nP")
   (when use-current
     (unless (equal major-mode 'org-mode)
       (user-error "Not in an org buffer")))
@@ -284,6 +356,7 @@ for use in batch mode."
                      (if (listp infile) infile (list infile))))
          (buffer (get-buffer-create "*clock-entries-csv*"))
          (entries (org-clock-csv--get-entries filelist)))
+    (when consolidate (setq entries (org-clock-csv--consolidate-entries entries)))
     (with-current-buffer buffer
       (goto-char 0)
       (erase-buffer)
