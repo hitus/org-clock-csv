@@ -4,9 +4,9 @@
 
 ;;; Helper Code:
 
-(defun org-clock-csv-should-match (input output)
+(defun org-clock-csv-should-match (input output &optional consolidate)
   "Test that clock entries in INPUT match the .csv OUTPUT file."
-  (let* ((in (with-current-buffer (org-clock-csv input 'no-switch)
+  (let* ((in (with-current-buffer (org-clock-csv input 'no-switch consolidate)
                (buffer-string)))
          (out (with-temp-buffer
                 (insert-file-contents output)
@@ -80,6 +80,12 @@
                             (plist-get plist ':end))
                       ","))))
     (org-clock-csv-should-match "tests/issue-23.org" "tests/issue-23.csv")))
+
+(ert-deftest test-task-consolidation ()
+  "Test consolidating clock entries for a task/day into a single start/end/duration for accounting or time entry"
+  (let ((org-clock-csv-header org-clock-csv-header-all-props)
+        (org-clock-csv-row-fmt #'org-clock-csv-all-props-row-fmt))
+    (org-clock-csv-should-match "tests/task-consolidation.org" "tests/task-consolidation.csv" t)))
 
 ;; Local Variables:
 ;; coding: utf-8

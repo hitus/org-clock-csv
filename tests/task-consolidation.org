@@ -1,0 +1,37 @@
+#+TITLE: Sample
+
+* STARTED Example Task :ex1:ex2:
+:PROPERTIES:
+:CATEGORY: Category
+:Effort:   1:00
+:END:
+:LOGBOOK:
+CLOCK: [2017-01-01 Sun 08:00]--[2017-01-01 Sun 09:00] =>  1:00
+CLOCK: [2017-01-01 Sun 06:00]--[2017-01-01 Sun 07:00] =>  1:00
+:END:
+
+** DONE A Child Task
+CLOSED: [2017-01-01 Sun 09:32]
+:PROPERTIES:
+:Effort: 0:30
+:END:
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2017-01-01 Sun 09:32]
+CLOCK: [2017-01-01 Sun 09:00]--[2017-01-01 Sun 09:30] =>  0:30
+:END:
+
+* STARTED Another Task
+:PROPERTIES:
+:CATEGORY: Category
+:Effort:   4:00
+:END:
+:LOGBOOK:
+CLOCK: [2017-01-02 Mon 06:00]--[2017-01-02 Mon 07:00] =>  1:00
+CLOCK: [2017-01-01 Sun 09:00]--[2017-01-01 Sun 10:00] =>  1:00
+:END:
+
+* TODO An Unstarted task
+:PROPERTIES:
+:CATEGORY: Category
+:Effort:   1:00
+:END:
