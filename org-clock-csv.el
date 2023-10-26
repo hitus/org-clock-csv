@@ -63,7 +63,7 @@
   "Export `org-mode' clock entries to CSV format."
   :group 'external)
 
-(defcustom org-clock-csv-header "task,parents,category,start,end,effort,ishabit,tags"
+(defcustom org-clock-csv-header "task,parents,category,date,duration,effort,ishabit,tags"
   "Header for the CSV output.
 
 Be sure to keep this in sync with changes to
@@ -90,8 +90,8 @@ See `org-clock-csv-default-row-fmt' for an example."
              (list (org-clock-csv--escape (plist-get plist ':task))
                    (org-clock-csv--escape (s-join org-clock-csv-headline-separator (plist-get plist ':parents)))
                    (org-clock-csv--escape (plist-get plist ':category))
-                   (plist-get plist ':start)
-                   (plist-get plist ':end)
+                   (plist-get plist ':date)
+                   (plist-get plist ':duration)
                    (plist-get plist ':effort)
                    (plist-get plist ':ishabit)
                    (plist-get plist ':tags))
@@ -196,6 +196,12 @@ properties."
                                           :STYLE task-headline))
                       "t"))
            (category (org-clock-csv--find-category task-headline default-category))
+           (date (format "%d-%s-%s"
+                          (org-element-property :year-start timestamp)
+                          (org-clock-csv--pad
+                           (org-element-property :month-start timestamp))
+                          (org-clock-csv--pad
+                           (org-element-property :day-start timestamp))))
            (start (format "%d-%s-%s %s:%s"
                           (org-element-property :year-start timestamp)
                           (org-clock-csv--pad
@@ -223,6 +229,7 @@ properties."
             :parents parents
             :title title
             :category category
+            :date date
             :start start
             :end end
             :duration duration
@@ -258,7 +265,7 @@ properties."
         (lambda (a b) (time-less-p (date-to-time a) (date-to-time b)))))
 
 (defun org-clock-csv--concat-element-plists (left right)
-  "Given two parsed ELEMENT plists, combines them together into a single item"
+  "Given two parsed ELEMENT plists, combines them together into a single item.  In combined plist the start and end points loose their meanings, so make sure you don't use them to calculate durations yourself."
   (let* ((start (car (org-clock-csv--sort-datestrings (plist-get left ':start) (plist-get right ':start))))
          (end (cadr (org-clock-csv--sort-datestrings (plist-get left ':end) (plist-get right ':end))))
          (combined-duration (org-clock-csv--combine-durations (plist-get left ':duration) (plist-get right ':duration))))
@@ -267,6 +274,7 @@ properties."
           :parents (plist-get left ':parents)
           :title (plist-get left ':title)
           :category (plist-get left ':category)
+          :date (plist-get left ':date)
           :start start
           :end end
           :duration combined-duration
