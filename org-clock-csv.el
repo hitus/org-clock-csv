@@ -248,7 +248,7 @@ properties."
 (defun org-clock-csv--combine-durations (&rest durations)
   "Given any number of duration strings of shape \"HH:MM\", combines them together and returns an aggregate duration string in the same shape."
   (org-clock-csv--integer-to-duration (seq-reduce
-                                       (lambda (acc duration) (+ acc (duration-to-integer duration)))
+                                       (lambda (acc duration) (+ acc (org-clock-csv--duration-to-integer duration)))
                                        durations 0
                                        )))
 
